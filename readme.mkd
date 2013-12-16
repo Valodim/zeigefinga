@@ -1,0 +1,13 @@
+
+usage:
+
+make login 2> /dev/null | egrep --line-buffered '^(\-?[0-9]+ ?){7}' | python animate.py 1 2 3
+
+make login 2> /dev/null | egrep --line-buffered '^(\-?[0-9]+ ?){7}' | python point.py
+
+
+udev rules for inga, /etc/udev/rules.d/99-inga.conf
+
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", ATTRS{product}=="INGA", GROUP="plugdev"
+
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", ATTRS{product}=="INGA", GROUP="plugdev"
