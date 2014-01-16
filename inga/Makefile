@@ -4,5 +4,5 @@ all: $(CONTIKI_PROJECT)
 	
 TARGET=inga
 
-CONTIKI = ../contiki/
+CONTIKI = ../../contiki/
 include $(CONTIKI)/Makefile.include
