@@ -9,30 +9,27 @@ import time
 import lib.bufs as bufs
 from lib.streaminput import StreamInput
 
-ax = p.subplot(111)
-canvas = ax.figure.canvas
-
+# remap input fields?
+fields = map(lambda x: int(x)-1, sys.argv[1:]) if len(sys.argv) > 1 else None
 # get a stream input object from sys.stdin
-stream = StreamInput(sys.stdin)
+stream = StreamInput(sys.stdin, fields=fields)
 # prototype from three consecutive lines of equal shape
 if not stream.prototype(1):
     sys.exit(1)
 
+# circular buffer holds 100 elements for the y-axis
 cbuf = bufs.circbuf(shape=stream.shape)
 
-# set y axis limits
+# set up plotting stuff
+ax = p.subplot(111)
+canvas = ax.figure.canvas
 ax.set_ylim(-100, 100)
 
 # create the initial line
 x = p.arange(0, 100)
 plots = { }
-if len(sys.argv) > 1:
-    for i in sys.argv[1:]:
-        print i
-        plots[int(i)], = p.plot(x, p.empty(100), animated=True)
-else:
-    for i in range(0, stream.shape[0]):
-        plots[i], = p.plot(x, p.empty(100), animated=True)
+for i in range(stream.shape[0]):
+    plots[i], = p.plot(x, p.empty(100), animated=True)
 
 # save the clean slate background -- everything but the animated line
 # is drawn and saved in the pixel buffer background

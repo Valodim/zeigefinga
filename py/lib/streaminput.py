@@ -4,10 +4,13 @@ import sys
 import bufs
 
 class StreamInput(object):
-    def __init__(self, f, numbuf=False):
+
+    def __init__(self, f, numbuf=False, fields=None):
         self.shape = None
+        self.proto = None
         self.buf = None
         self.numbuf = numbuf
+        self.fields = fields
         self.f = f
 
     def prototype(self, num=3, sep=' ', **kwargs):
@@ -36,7 +39,12 @@ class StreamInput(object):
             # if we have enough, return true
             if j >= num:
                 # we got a shape prototype!
-                self.shape = inp.shape
+                self.proto = inp.shape
+                if self.fields is not None:
+                    self.shape = [len(self.fields)]
+                else:
+                    self.shape = self.proto
+
                 if self.numbuf:
                     self.buf = bufs.arrbuf(length=self.numbuf, shape=self.shape)
                 print >> sys.stderr, "using prototype format: ", inp
@@ -47,18 +55,26 @@ class StreamInput(object):
 
     def __iter__(self):
 
+        if self.fields is not None:
+            inp = numpy.ndarray(shape=self.shape)
+
         while True:
 
-            inp = self.f.readline()
+            inp2 = self.f.readline()
             # break on eol
-            if not inp:
+            if not inp2:
                 break
 
             # skip markers
             try:
-                inp = numpy.fromstring(inp, sep=' ')
-                if inp.shape != self.shape:
+                inp2 = numpy.fromstring(inp2, sep=' ')
+                if inp2.shape != self.proto:
                     raise ValueError()
+                if self.fields:
+                    for i in range(len(self.fields)):
+                        inp[i] = inp2[self.fields[i]]
+                else:
+                    inp = inp2
 
                 # return or buffer
                 if not self.buf:
