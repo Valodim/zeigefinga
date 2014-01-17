@@ -16,6 +16,7 @@ stream = StreamInput(sys.stdin, fields=fields)
 # prototype from three consecutive lines of equal shape
 if not stream.prototype(1):
     sys.exit(1)
+gen = iter(stream)
 
 # circular buffer holds 100 elements for the y-axis
 cbuf = bufs.circbuf(shape=stream.shape)
@@ -34,8 +35,6 @@ for i in range(stream.shape[0]):
 # save the clean slate background -- everything but the animated line
 # is drawn and saved in the pixel buffer background
 background = None
-
-gen = iter(stream)
 
 def update_line(*args):
     global gen, cbuf, background, plots

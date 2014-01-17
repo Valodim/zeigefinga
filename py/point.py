@@ -30,8 +30,7 @@ ax.add_patch(circ)
 background = None
 
 def update_line(*args):
-    global buf, cbuf, background, plots
-    global circ
+    global gen, background, circ
 
     inp = gen.next()
     if inp is False:
@@ -47,7 +46,7 @@ def update_line(*args):
     # reset into the middle
     # if inp[-1] == 1:
         # circ.center = (0,0)
-    # elif abs(cbuf.get()[-1,5]) > 2 and abs(cbuf.get()[-1,4]) > 2:
+    # elif abs(inp[5]) > 2 and abs(inp[4]) > 2:
     # else:
     circ.center = (circ.center[0] -inp[1], circ.center[1] + inp[0])
     ax.draw_artist(circ)

@@ -8,21 +8,16 @@ import time
 import uinput
 
 import lib.bufs as bufs
+from lib.streaminput import StreamInput
 
-
-# for profiling
-tstart = time.time()
-
-# read the first line to determine number of input fields
-inp = sys.stdin.readline()
-if not inp:
-    sys.exit(0)
-print >> sys.stderr, "using prototype format: ", inp
-inp = numpy.fromstring(inp.strip(), sep=' ')
-
-buf = bufs.arrbuf(length=2, shape=inp.shape)
-cbuf = bufs.circbuf(shape=inp.shape)
-shortbuf = bufs.circbuf(length=15, shape=inp.shape)
+# remap input fields?
+fields = map(lambda x: int(x)-1, sys.argv[1:]) if len(sys.argv) > 1 else None
+# get a stream input object from sys.stdin
+stream = StreamInput(sys.stdin, fields=fields)
+# prototype from three consecutive lines of equal shape
+if not stream.prototype(1):
+    sys.exit(1)
+gen = iter(stream)
 
 device = uinput.Device([
     uinput.REL_X,
@@ -35,37 +30,23 @@ device = uinput.Device([
 time.sleep(0.3)
 
 def update_line(*args):
-    global buf, cbuf
+    global gen
 
-    inp = sys.stdin.readline()
-    if not inp:
+    inp = gen.next()
+    if inp is False:
+        print >> sys.stderr, "reached EOF or error in input"
         sys.exit(0)
-    # do nothing, yet
-    if inp == "--MARKER--\n":
-        print >> sys.stderr, "found a marker, ignoring."
-        return True
 
-    inp = numpy.fromstring(inp, sep=' ')
-    if not buf.put(inp):
-        return True
-
-    newmean = buf.get()
-    cbuf.put(newmean)
-    shortbuf.put(newmean)
-
-    print int(cbuf.get()[-1,4]), int(cbuf.get()[-1,5]), int(cbuf.get()[-1,6])
-    if int(cbuf.get()[-1,6]) is 1:
+    print int(inp[1]), int(inp[0])
+    if False: # or int(cbuf.get()[-1,6]) is 1:
         print "!"
         device.emit(uinput.ABS_X, 127)
         device.emit(uinput.ABS_Y, 127)
     else:
-        device.emit(uinput.REL_X, -int(cbuf.get()[-1,5]), syn=False)
-        device.emit(uinput.REL_Y, -int(0.8*cbuf.get()[-1,4]))
+        device.emit(uinput.REL_X, int(inp[0]), syn=False)
+        device.emit(uinput.REL_Y, -int(0.8*inp[1]))
 
-    update_line.cnt += 1
     return True
-
-update_line.cnt = 0
 
 gobject.io_add_watch(sys.stdin, gobject.IO_IN, update_line)
 gobject.MainLoop().run()
