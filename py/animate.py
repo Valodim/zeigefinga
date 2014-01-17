@@ -15,12 +15,10 @@ canvas = ax.figure.canvas
 # get a stream input object from sys.stdin
 stream = StreamInput(sys.stdin)
 # prototype from three consecutive lines of equal shape
-if not stream.prototype(3):
+if not stream.prototype(1):
     sys.exit(1)
 
-buf = bufs.arrbuf(length=2, shape=stream.shape)
 cbuf = bufs.circbuf(shape=stream.shape)
-shortbuf = bufs.circbuf(length=15, shape=stream.shape)
 
 # set y axis limits
 ax.set_ylim(-100, 100)
@@ -43,18 +41,14 @@ background = None
 gen = iter(stream)
 
 def update_line(*args):
-    global gen, buf, cbuf, background, plots
+    global gen, cbuf, background, plots
 
     inp = gen.next()
-    if inp is None:
+    if inp is False:
+        print >> sys.stderr, "reached EOF or error in input"
         sys.exit(0)
 
-    if not buf.put(inp):
-        return True
-
-    newmean = buf.get()
-    cbuf.put(newmean)
-    shortbuf.put(newmean)
+    cbuf.put(inp)
 
     if background is None:
         background = canvas.copy_from_bbox(ax.bbox)

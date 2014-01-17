@@ -1,9 +1,13 @@
 import numpy
 import sys
 
+import bufs
+
 class StreamInput(object):
-    def __init__(self, f):
+    def __init__(self, f, numbuf=False):
         self.shape = None
+        self.buf = None
+        self.numbuf = numbuf
         self.f = f
 
     def prototype(self, num=3, sep=' ', **kwargs):
@@ -33,6 +37,8 @@ class StreamInput(object):
             if j >= num:
                 # we got a shape prototype!
                 self.shape = inp.shape
+                if self.numbuf:
+                    self.buf = bufs.arrbuf(length=self.numbuf, shape=self.shape)
                 print >> sys.stderr, "using prototype format: ", inp
                 return True
 
@@ -53,7 +59,15 @@ class StreamInput(object):
                 inp = numpy.fromstring(inp, sep=' ')
                 if inp.shape != self.shape:
                     raise ValueError()
-                yield inp
+
+                # return or buffer
+                if not self.buf:
+                    yield inp
+                else:
+                    # put in buffer, and yield mean value if return value is true
+                    if self.buf.put(inp):
+                        yield self.buf.get()
+
             except ValueError:
                 print >> sys.stderr, "bad input line:", inp
 
