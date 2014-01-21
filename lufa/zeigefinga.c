@@ -35,6 +35,10 @@
 
 #include <stdio.h>
 #include "contiki.h"
+#include "net/uip.h"
+#include "net/uip-ds6.h"
+#include "simple-udp.h"
+
 #include "Config/LUFAConfig.h"
 #include "lufa.h"
 
@@ -62,45 +66,30 @@ USB_ClassInfo_HID_Device_t Mouse_HID_Interface =
 	};
 
 /*---------------------------------------------------------------------------*/
-PROCESS(radio_process, "radio input process");
-PROCESS(lufa_process, "Accelerometer process");
-AUTOSTART_PROCESSES(&radio_process, &lufa_process);
-/*---------------------------------------------------------------------------*/
-static struct etimer timer;
-PROCESS_THREAD(radio_process, ev, data)
+
+static struct simple_udp_connection broadcast_connection;
+
+static void receiver(struct simple_udp_connection *c,
+         const uip_ipaddr_t *sender_addr, uint16_t sender_port,
+         const uip_ipaddr_t *receiver_addr, uint16_t receiver_port,
+         const uint8_t *data, uint16_t datalen)
 {
-    PROCESS_BEGIN();
-
-    // just wait shortly to be sure sensor is available
-    etimer_set(&timer, CLOCK_SECOND * 0.05);
-    PROCESS_YIELD();
-
-    while (1) {
-        if(ev == PROCESS_EVENT_TIMER) {
-            // TODO: implement input from radio
-            printf("hi\n");
-            etimer_reset(&timer);
-
-        }
-        PROCESS_YIELD();
-        // PROCESS_PAUSE();
-    }
-
-    PROCESS_END();
+  printf("Data received on port %d from port %d with length %d\n", receiver_port, sender_port, datalen);
 }
 
-PROCESS_THREAD(lufa_process, ev, data)
+PROCESS(finga_process, "radio to usb hid");
+AUTOSTART_PROCESSES(&finga_process);
+
+PROCESS_THREAD(finga_process, ev, data)
 {
     PROCESS_BEGIN();
+
+    simple_udp_register(&broadcast_connection, 12345, NULL, 12345, receiver);
 
     /* Disable clock division */
     // not sure if this is needed?
     // clock_prescale_set(clock_div_1);
 
-    /* Hardware Initialization */
-    // Joystick_Init();
-    // LEDs_Init();
-    // Buttons_Init();
     USB_Init();
 
     while (1) {
@@ -110,8 +99,6 @@ PROCESS_THREAD(lufa_process, ev, data)
     }
 
     PROCESS_END();
-
-
 }
 
 /** Event handler for the library USB Connection event. */
