@@ -12,19 +12,19 @@ TARGET       = avr-ravenusb
 # enable radio stack (this is why we want contiki!)
 RF230BB=1
 
-# enable ipv6
-UIP_CONF_IPV6=1
-
 # disable all of contiki's usb functionality
 # requires contiki patch: 24a7ab5b
 CONTIKI_NO_USB=1
 
-# disable cfs, raven doesn't support it
-# requires contiki patch: 1e1adbb6
-CONTIKI_NO_CFS=1
+# for contiki: marks dependency on lufa thing
+PROJECT_LIBRARIES = lib$(TARGET).a
 
 include $(CONTIKI)/Makefile.include
 
+# override some targets that don't play nice with PROJECT_LIBFILES
+%.hex: %.$(TARGET)
+	$(OBJCOPY) $^ -j .text -j .data -O ihex $@
+%.out: %.$(TARGET)
 
 ## LUFA ##
 
@@ -46,14 +46,12 @@ include $(LUFA_PATH)/Build/lufa_core.mk
 include $(LUFA_PATH)/Build/lufa_dfu.mk
 include $(LUFA_PATH)/Build/lufa_hid.mk
 
-# for contiki: marks dependency (doesn't work?)
-PROJECT_LIBRARIES = lib$(TARGET).a
-# for contiki: includes lufa-built lib in binary
-TARGET_LIBFILES = lib$(TARGET).a
 # for contiki: include path for LUFA/ stuff
 PROJECTDIRS = $(LUFA_PATH)/..
 # for contiki: lufa needs stuff from c99
 CFLAGS     += -std=c99 -DF_USB=$(F_USB) 
+# for contiki: includes lufa-built lib in binary
+TARGET_LIBFILES = lib$(TARGET).a
 
 all: $(CONTIKI_PROJECT)
 
@@ -61,7 +59,6 @@ all: $(CONTIKI_PROJECT)
 ## AVRDUDE ##
 
 AVRDUDE_PROGRAMMER = jtag2
-AVRDUDE_PORT       = usb:00B000000D79
+AVRDUDE_PORT       = usb
 # so convenient :3
 include $(LUFA_PATH)/Build/lufa_avrdude.mk
-

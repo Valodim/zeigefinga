@@ -35,6 +35,7 @@
 
 #include <stdio.h>
 #include "contiki.h"
+#include "contiki-raven.h"
 #include "net/uip.h"
 #include "net/uip-ds6.h"
 #include "simple-udp.h"
@@ -84,18 +85,36 @@ PROCESS_THREAD(finga_process, ev, data)
 {
     PROCESS_BEGIN();
 
-    simple_udp_register(&broadcast_connection, 12345, NULL, 12345, receiver);
+    // simple_udp_register(&broadcast_connection, 12345, NULL, 12345, receiver);
+
+    static struct etimer et;
 
     /* Disable clock division */
     // not sure if this is needed?
     // clock_prescale_set(clock_div_1);
 
+    Leds_init();
     USB_Init();
 
+    etimer_set(&et, CLOCK_SECOND);
+    Leds_on();
+
+    static int x = 0;
     while (1) {
-        HID_Device_USBTask(&Mouse_HID_Interface);
-        USB_USBTask();
+        if(etimer_expired(&et)) {
+            x = !x;
+            if(x)
+                Leds_off();
+            else
+                Leds_on();
+
+            etimer_set(&et, CLOCK_SECOND);
+        } else {
+            HID_Device_USBTask(&Mouse_HID_Interface);
+            USB_USBTask();
+        }
         PROCESS_PAUSE();
+
     }
 
     PROCESS_END();
@@ -104,13 +123,11 @@ PROCESS_THREAD(finga_process, ev, data)
 /** Event handler for the library USB Connection event. */
 void EVENT_USB_Device_Connect(void)
 {
-	LEDs_SetAllLEDs(LEDMASK_USB_ENUMERATING);
 }
 
 /** Event handler for the library USB Disconnection event. */
 void EVENT_USB_Device_Disconnect(void)
 {
-	LEDs_SetAllLEDs(LEDMASK_USB_NOTREADY);
 }
 
 /** Event handler for the library USB Configuration Changed event. */
@@ -121,8 +138,6 @@ void EVENT_USB_Device_ConfigurationChanged(void)
 	ConfigSuccess &= HID_Device_ConfigureEndpoints(&Mouse_HID_Interface);
 
 	USB_Device_EnableSOFEvents();
-
-	LEDs_SetAllLEDs(ConfigSuccess ? LEDMASK_USB_READY : LEDMASK_USB_ERROR);
 }
 
 /** Event handler for the library USB Control Request reception event. */
