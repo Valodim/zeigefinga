@@ -41,20 +41,20 @@
 #include "gyro-sensor.h"
 #include "button-sensor.h"
  
-#define dt 0.01 // 10 ms sample rate!
- 
 void ComplementaryFilter(short accData[3], short gyrData[3], double *pitch, double *roll)
 {
     double pitchAcc, rollAcc;
+
+    // printf("%d\n", (int) (((float)gyrData[0]) * 0.1));
  
     // Integrate the gyroscope data -> int(angularSpeed) = angle
-    *pitch += ((float)gyrData[0]) * dt; // Angle around the X-axis
-    *roll -= ((float)gyrData[1]) * dt;    // Angle around the Y-axis
+    *pitch += ((float)gyrData[0]) * 0.1; // Angle around the X-axis
+    *roll -= ((float)gyrData[1]) * 0.1;    // Angle around the Y-axis
 
     // Compensate for drift with accelerometer data if !bullshit
     // Sensitivity = -2 to 2 G at 16Bit -> 2G = 32768 && 0.5G = 8192
     int forceMagnitudeApprox = abs(accData[0]) + abs(accData[1]) + abs(accData[2]);
-    if (1 || forceMagnitudeApprox > 8192 && forceMagnitudeApprox < 32768)
+    if (forceMagnitudeApprox > 800 && forceMagnitudeApprox < 6000)
     {
         // Turning around the X axis results in a vector on the Y-axis
         pitchAcc = atan2f((float)accData[1], (float)accData[2]) * 180 / M_PI;
@@ -65,8 +65,11 @@ void ComplementaryFilter(short accData[3], short gyrData[3], double *pitch, doub
         // Turning around the Y axis results in a vector on the X-axis
         rollAcc = atan2f((float)accData[0], (float)accData[2]) * 180 / M_PI;
         if(rollAcc < 0)
-            pitchAcc = (360+rollAcc);
+            rollAcc = (360+rollAcc);
         *roll = *roll * 0.98 + rollAcc * 0.02;
+
+        // printf("%d %d\n", (int) *pitch, (int) pitchAcc);
+
     }
 } 
 
@@ -139,7 +142,7 @@ PROCESS_THREAD(acc_process, ev, data)
             gyroData[2] = gyro_sensor->value(GYRO_Z);
 
             ComplementaryFilter(accData, gyroData, &pitch, &roll);
-            printf("%d %d\n", (int) (pitch), (int) (roll));
+            // printf("%d %d\n", (int) (pitch), (int) (accData[1]));
 
             // read and output values
             // printf("%d %d %d %d %d %d %d\n",
