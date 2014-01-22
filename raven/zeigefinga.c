@@ -36,9 +36,7 @@
 #include <stdio.h>
 #include "contiki.h"
 #include "contiki-raven.h"
-#include "net/uip.h"
-#include "net/uip-ds6.h"
-#include "simple-udp.h"
+#include "net/rime.h"
 
 #include "Config/LUFAConfig.h"
 #include "lufa.h"
@@ -66,17 +64,29 @@ USB_ClassInfo_HID_Device_t Mouse_HID_Interface =
 			},
 	};
 
-/*---------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------*/
 
-static struct simple_udp_connection broadcast_connection;
 
-static void receiver(struct simple_udp_connection *c,
-         const uip_ipaddr_t *sender_addr, uint16_t sender_port,
-         const uip_ipaddr_t *receiver_addr, uint16_t receiver_port,
-         const uint8_t *data, uint16_t datalen)
+typedef struct {
+    uint16_t x, y;
+} buf_xy_t;
+static buf_xy_t buf_xy;
+
+static void
+broadcast_recv(struct broadcast_conn *c, const rimeaddr_t *from)
 {
-  printf("Data received on port %d from port %d with length %d\n", receiver_port, sender_port, datalen);
+  // printf("broadcast message received from %d.%d: '%s'\n",
+     //     from->u8[0], from->u8[1], (char *)packetbuf_dataptr());
+    buf_xy_t buf;
+    buf = *((buf_xy_t*) packetbuf_dataptr());
+
+    buf_xy.x += buf.x;
+    buf_xy.y += buf.y;
+
 }
+static const struct broadcast_callbacks broadcast_call = {broadcast_recv};
+static struct broadcast_conn broadcast;
+/*----------------------------------------------------------------------------*/
 
 PROCESS(finga_process, "radio to usb hid");
 AUTOSTART_PROCESSES(&finga_process);
@@ -85,7 +95,7 @@ PROCESS_THREAD(finga_process, ev, data)
 {
     PROCESS_BEGIN();
 
-    // simple_udp_register(&broadcast_connection, 12345, NULL, 12345, receiver);
+    broadcast_open(&broadcast, 129, &broadcast_call);
 
     static struct etimer et;
 
@@ -108,11 +118,18 @@ PROCESS_THREAD(finga_process, ev, data)
             else
                 Leds_on();
 
+            // buf_xy.x = 1;
+            // buf_xy.y = -1;
+            // packetbuf_copyfrom(&buf_xy, sizeof(buf_xy_t));
+            // broadcast_send(&broadcast);
+
             etimer_set(&et, CLOCK_SECOND);
+
         } else {
             HID_Device_USBTask(&Mouse_HID_Interface);
             USB_USBTask();
         }
+
         PROCESS_PAUSE();
 
     }
@@ -170,9 +187,12 @@ bool CALLBACK_HID_Device_CreateHIDReport(USB_ClassInfo_HID_Device_t* const HIDIn
 {
     USB_MouseReport_Data_t* MouseReport = (USB_MouseReport_Data_t*)ReportData;
 
-    // stupid dummy, just move the mouse around
-    MouseReport->X = -1;
-    MouseReport->Y =  1;
+    // set to the currently buffered values
+    MouseReport->X = buf_xy.x;
+    MouseReport->Y = buf_xy.y;
+
+    buf_xy.x = 0;
+    buf_xy.y = 0;
 
     *ReportSize = sizeof(USB_MouseReport_Data_t);
     return true;
