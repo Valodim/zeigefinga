@@ -75,7 +75,7 @@ PROCESS_THREAD(gyro_process, ev, data)
     }
 
     // L3G4200D_ODR_100HZ // L3G4200D_ODR_200HZ // L3G4200D_ODR_400HZ // L3G4200D_ODR_800HZ
-    if(l3g4200d_set_data_rate(L3G4200D_ODR_200HZ) != 0) {
+    if(l3g4200d_set_data_rate(L3G4200D_ODR_400HZ) != 0) {
         printf("Error: Failed to init gyro / step 3, aborting...\n");
         PROCESS_EXIT();
     }
@@ -88,37 +88,45 @@ PROCESS_THREAD(gyro_process, ev, data)
     l3g4200d_fifo_enable();
 
     // how long to wait for the fifo to fill
-    etimer_set(&timer, CLOCK_SECOND * 0.03);
+    etimer_set(&timer, CLOCK_SECOND * 0.02);
 
-    int i;
-    static angle_data_t gyro_values[L3G4200D_FIFO_SIZE];
-    static int16_t x, y, z;
-    static int num = 0;
+    int i, num;
+    int16_t x, y, z;
+    angle_data_t gyro_values[L3G4200D_FIFO_SIZE];
 
     while (1) {
         // if(ev == PROCESS_EVENT_TIMER)
         {
-            num = l3g4200d_get_angle_fifo(gyro_values);
-            // gyro_values[0] = l3g4200d_get_angle(); num = 1;
             x = y = z = 0;
+
+            // get fifo values
+            num = l3g4200d_get_angle_fifo(gyro_values);
+            // or emulate fifo data from bypass mode
+            // gyro_values[0] = l3g4200d_get_angle(); num = 1;
+
+#if 1
+            // approach 1: accumulate and divide later
+            // smoother movement, lack of a deadzone leads to shaky cursor
             for(i = 0; i < num; i++) {
-                // the factor is the raw -> dps transformation, values are
-                // hardware and dps mode specific
+                x += (gyro_values[i].x * 0.00875);
+                y += (gyro_values[i].y * 0.00875);
+                z += (gyro_values[i].z * 0.00875);
+            }
+            x /= num; y /= num; z /= num;
+#else
+            // approach 2: divide individual values
+            // works as a natural deadzone, which makes controls feel less but
+            // allows keeping the cursor in position easily
+            for(i = 0; i < num; i++) {
                 x += (gyro_values[i].x * 0.00875) / num;
                 y += (gyro_values[i].y * 0.00875) / num;
                 z += (gyro_values[i].z * 0.00875) / num;
-
-                // TODO division first? leads to smaller values with some cutoff...
-                // x += l3g4200d_raw_to_dps(gyro_values[i].x/num);
-                // y += l3g4200d_raw_to_dps(gyro_values[i].y/num);
-                // z += l3g4200d_raw_to_dps(gyro_values[i].z/num);
             }
-            // TODO or maybe divide accumulated value afterwards?
-            // x /= num; y /= num; z /= num;
+#endif
             if(num > 0) {
-                buf_xy.x = -z;
-                buf_xy.y = -y;
-                if(abs(z) > 1 || abs(y) > 1) {
+                if(abs(z)+abs(y) > 0) {
+                    buf_xy.x = -z;
+                    buf_xy.y = -y;
                     packetbuf_copyfrom(&buf_xy, sizeof(buf_xy_t));
                     broadcast_send(&broadcast);
                 }
