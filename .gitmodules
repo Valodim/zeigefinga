@@ -1,0 +1,9 @@
+[submodule "lib/contiki-inga"]
+	path = lib/contiki-inga
+	url = https://github.com/Valodim/contiki.git
+[submodule "lib/contiki-raven"]
+	path = lib/contiki-raven
+	url = https://github.com/Valodim/contiki.git
+[submodule "lib/lufa"]
+	path = lib/lufa
+	url = https://github.com/abcminiuser/lufa

@@ -1,8 +1,9 @@
-CONTIKI_PROJECT = zeigefinga
 
 ## CONTIKI ##
 
-CONTIKI = ../../contiki/
+CONTIKI_PROJECT = zeigefinga
+
+CONTIKI = ../lib/contiki-raven
 
 # multipurpose:
 # in lufa, this is application name
@@ -14,7 +15,11 @@ RF230BB=1
 
 # disable all of contiki's usb functionality
 # requires contiki patch: 24a7ab5b
-CONTIKI_NO_USB=1
+CONTIKI_NO_USB = 1
+
+# disable cfs (don't need this anyways)
+# requires contiki patch: 0a3be5f5
+CONTIKI_NO_CFS = 1
 
 # for contiki: marks dependency on lufa thing
 PROJECT_LIBRARIES = lib$(TARGET).a
@@ -26,9 +31,10 @@ include $(CONTIKI)/Makefile.include
 	$(OBJCOPY) $^ -j .text -j .data -O ihex $@
 %.out: %.$(TARGET)
 
+
 ## LUFA ##
 
-LUFA_PATH    = ../../lufa/LUFA/
+LUFA_PATH    = ../lib/lufa/LUFA/
 ARCH         = AVR8
 F_CPU        = 8000000
 F_USB        = $(F_CPU)UL
@@ -52,8 +58,6 @@ PROJECTDIRS = $(LUFA_PATH)/..
 CFLAGS     += -std=c99 -DF_USB=$(F_USB) 
 # for contiki: includes lufa-built lib in binary
 TARGET_LIBFILES = lib$(TARGET).a
-
-all: $(CONTIKI_PROJECT)
 
 
 ## AVRDUDE ##
