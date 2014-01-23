@@ -72,6 +72,8 @@ typedef struct {
 } buf_xy_t;
 static buf_xy_t buf_xy;
 
+static struct etimer et;
+
 static void
 broadcast_recv(struct broadcast_conn *c, const rimeaddr_t *from)
 {
@@ -83,6 +85,8 @@ broadcast_recv(struct broadcast_conn *c, const rimeaddr_t *from)
     buf_xy.x += buf.x;
     buf_xy.y += buf.y;
 
+    Leds_on();
+    etimer_set(&et, CLOCK_SECOND*0.05);
 }
 static const struct broadcast_callbacks broadcast_call = {broadcast_recv};
 static struct broadcast_conn broadcast;
@@ -97,8 +101,6 @@ PROCESS_THREAD(finga_process, ev, data)
 
     broadcast_open(&broadcast, 129, &broadcast_call);
 
-    static struct etimer et;
-
     /* Disable clock division */
     // not sure if this is needed?
     // clock_prescale_set(clock_div_1);
@@ -107,28 +109,15 @@ PROCESS_THREAD(finga_process, ev, data)
     USB_Init();
 
     etimer_set(&et, CLOCK_SECOND);
-    Leds_on();
 
     static int x = 0;
     while (1) {
         if(etimer_expired(&et)) {
-            x = !x;
-            if(x)
-                Leds_off();
-            else
-                Leds_on();
-
-            // buf_xy.x = 1;
-            // buf_xy.y = -1;
-            // packetbuf_copyfrom(&buf_xy, sizeof(buf_xy_t));
-            // broadcast_send(&broadcast);
-
-            etimer_set(&et, CLOCK_SECOND);
-
-        } else {
-            HID_Device_USBTask(&Mouse_HID_Interface);
-            USB_USBTask();
+            Leds_off();
         }
+
+        HID_Device_USBTask(&Mouse_HID_Interface);
+        USB_USBTask();
 
         PROCESS_PAUSE();
 
