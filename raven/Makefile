@@ -21,6 +21,8 @@ CONTIKI_NO_USB = 1
 # requires contiki patch: 0a3be5f5
 CONTIKI_NO_CFS = 1
 
+CFLAGS       += -DAUTOSTART_ENABLE
+
 # for contiki: marks dependency on lufa thing
 PROJECT_LIBRARIES = lib$(TARGET).a
 
