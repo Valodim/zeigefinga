@@ -35,17 +35,28 @@
 
 #include <stdio.h>
 #include "contiki.h"
+#include "net/rime.h"
 #include "l3g4200d.h"
+typedef struct {
+    uint16_t x, y;
+} buf_xy_t;
+static buf_xy_t buf_xy;
 
 /*---------------------------------------------------------------------------*/
 PROCESS(gyro_process, "gyro process");
 AUTOSTART_PROCESSES(&gyro_process);
 /*---------------------------------------------------------------------------*/
 static struct etimer timer;
+static const struct broadcast_callbacks broadcast_call = {};
+static struct broadcast_conn broadcast;
 PROCESS_THREAD(gyro_process, ev, data)
 {
 
+    PROCESS_EXITHANDLER(broadcast_close(&broadcast);)
+
     PROCESS_BEGIN();
+
+    broadcast_open(&broadcast, 129, &broadcast_call);
 
     // just wait shortly to be sure sensor is available
     etimer_set(&timer, CLOCK_SECOND * 0.05);
@@ -104,11 +115,15 @@ PROCESS_THREAD(gyro_process, ev, data)
             }
             // TODO or maybe divide accumulated value afterwards?
             // x /= num; y /= num; z /= num;
-
-            // only print values if we got any this iteration
-            if(num > 0)
+            if(num > 0) {
+                buf_xy.x = -z;
+                buf_xy.y = -y;
+                if(abs(z) > 1 || abs(y) > 1) {
+                    packetbuf_copyfrom(&buf_xy, sizeof(buf_xy_t));
+                    broadcast_send(&broadcast);
+                }
                 printf("%d\t%d\t%d\t%d\n", num, x, y, z);
-
+            }
             // reset timer
             etimer_reset(&timer);
         }
