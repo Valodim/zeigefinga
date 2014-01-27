@@ -48,7 +48,7 @@ PROCESS_THREAD(default_app_process, ev, data)
     }
     if ( etimer_expired(&timer)){
       etimer_set(&timer,  CLOCK_SECOND);
-      printf("state: %d\n", button_sensor2.value(0));
+      printf("state: %d %d\n", button_sensor2.value(0), button_sensor2.value(1));
       leds_invert(2);
     }
 

@@ -48,7 +48,8 @@
 #define BUTTON_PORT       PORTA
 #define BUTTON_DDR        DDRA
 #define BUTION_PIN        PINA
-#define BUTTON_P          PA0
+#define BUTTON_P0         PA0
+#define BUTTON_P1         PA1
 #define BUTTON_REG_EICR   PCICR
 #define BUTTON_REG_EIMSK  PCMSK0
 
@@ -68,15 +69,20 @@ ISR(BUTTON_INT_vect) {
 }
 static void
 init() {
-  BUTTON_DDR &= ~(1 << BUTTON_P);
-  BUTTON_PORT |= (1 << BUTTON_P);
-  // BUTTON_REG_EICR |= (0x1 << BUTTON_ISC);
+  BUTTON_DDR &= ~(1 << BUTTON_P0 | 1 << BUTTON_P1);
+  BUTTON_PORT |= (1 << BUTTON_P0 | 1 << BUTTON_P1);
+  BUTTON_REG_EICR |= (0x1 << BUTTON_ISC); // 1 = any edge
 }
 /*----------------------------------------------------------------------------*/
 static int
 value(int type) {
-  return (BUTION_PIN & (1 << BUTTON_P))
-          || !timer_expired(&debouncetimer);
+  switch(type) {
+    case 0:
+      return (1 - ((BUTION_PIN & (1 << BUTTON_P0)) >> BUTTON_P0));
+    case 1:
+      return (1 - ((BUTION_PIN & (1 << BUTTON_P1)) >> BUTTON_P1));
+  }
+  return 0;
 }
 /*----------------------------------------------------------------------------*/
 static int
@@ -91,12 +97,12 @@ configure(int type, int c) {
         if (!status(SENSORS_ACTIVE)) {
           timer_set(&debouncetimer, DEBOUNCE_TIME);
           init();
-          // BUTTON_REG_EIMSK |= (1 << BUTTON_INT);
+          BUTTON_REG_EIMSK |= (1 << BUTTON_INT);
           sei();
         }
         // deactivate sensor
       } else {
-        // BUTTON_REG_EIMSK &= ~(1 << BUTTON_INT);
+        BUTTON_REG_EIMSK &= ~(1 << BUTTON_INT);
       }
       return 1;
   }
@@ -110,7 +116,7 @@ status(int type) {
       return (BUTTON_REG_EIMSK & (1 << BUTTON_INT));
       break;
     case SENSORS_READY:
-      return ~(BUTTON_DDR & (1 << BUTTON_P));
+      return ~(BUTTON_DDR & (1 << BUTTON_P0 | 1 << BUTTON_P1));
   }
 
   return 0;
