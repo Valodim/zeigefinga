@@ -39,7 +39,8 @@
 #include "button-sensor2.h"
 #include "l3g4200d.h"
 typedef struct {
-    uint16_t x, y;
+    uint8_t x, y;
+    uint8_t button;
 } buf_xy_t;
 static buf_xy_t buf_xy;
 
@@ -126,9 +127,10 @@ PROCESS_THREAD(gyro_process, ev, data)
             }
 #endif
             if(num > 0) {
-                if(button_sensor2.value(0) && abs(z)+abs(y) > 0) {
+                if( (button_sensor2.value(0) || button_sensor2.value(1)) && abs(z)+abs(y) > 0) {
                     buf_xy.x = z;
                     buf_xy.y = -y;
+                    buf_xy.button = button_sensor2.value(1);
                     packetbuf_copyfrom(&buf_xy, sizeof(buf_xy_t));
                     broadcast_send(&broadcast);
                 }

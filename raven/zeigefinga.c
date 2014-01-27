@@ -68,7 +68,8 @@ USB_ClassInfo_HID_Device_t Mouse_HID_Interface =
 
 
 typedef struct {
-    uint16_t x, y;
+    uint8_t x, y;
+    uint8_t button;
 } buf_xy_t;
 static buf_xy_t buf_xy;
 
@@ -84,6 +85,7 @@ broadcast_recv(struct broadcast_conn *c, const rimeaddr_t *from)
 
     buf_xy.x += buf.x;
     buf_xy.y += buf.y;
+    buf_xy.button = buf.button;
 
     Leds_on();
     etimer_set(&et, CLOCK_SECOND*0.05);
@@ -177,6 +179,7 @@ bool CALLBACK_HID_Device_CreateHIDReport(USB_ClassInfo_HID_Device_t* const HIDIn
     USB_MouseReport_Data_t* MouseReport = (USB_MouseReport_Data_t*)ReportData;
 
     // set to the currently buffered values
+    MouseReport->Button = buf_xy.button;
     MouseReport->X = buf_xy.x;
     MouseReport->Y = buf_xy.y;
 
