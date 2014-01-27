@@ -36,6 +36,7 @@
 #include <stdio.h>
 #include "contiki.h"
 #include "net/rime.h"
+#include "button-sensor2.h"
 #include "l3g4200d.h"
 typedef struct {
     uint16_t x, y;
@@ -55,6 +56,8 @@ PROCESS_THREAD(gyro_process, ev, data)
     PROCESS_EXITHANDLER(broadcast_close(&broadcast);)
 
     PROCESS_BEGIN();
+
+    SENSORS_ACTIVATE(button_sensor2);
 
     broadcast_open(&broadcast, 129, &broadcast_call);
 
@@ -88,15 +91,14 @@ PROCESS_THREAD(gyro_process, ev, data)
     l3g4200d_fifo_enable();
 
     // how long to wait for the fifo to fill
-    etimer_set(&timer, CLOCK_SECOND * 0.02);
+    etimer_set(&timer, CLOCK_SECOND * 0.03);
 
     int i, num;
     int16_t x, y, z;
     angle_data_t gyro_values[L3G4200D_FIFO_SIZE];
 
     while (1) {
-        // if(ev == PROCESS_EVENT_TIMER)
-        {
+        if(ev == PROCESS_EVENT_TIMER) {
             x = y = z = 0;
 
             // get fifo values
@@ -124,8 +126,8 @@ PROCESS_THREAD(gyro_process, ev, data)
             }
 #endif
             if(num > 0) {
-                if(abs(z)+abs(y) > 0) {
-                    buf_xy.x = -z;
+                if(button_sensor2.value(0) && abs(z)+abs(y) > 0) {
+                    buf_xy.x = z;
                     buf_xy.y = -y;
                     packetbuf_copyfrom(&buf_xy, sizeof(buf_xy_t));
                     broadcast_send(&broadcast);
