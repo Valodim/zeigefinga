@@ -68,6 +68,7 @@ USB_ClassInfo_HID_Device_t Mouse_HID_Interface =
 
 
 typedef struct {
+    // this is uint ON PURPOSE!
     uint8_t x, y;
     uint8_t button;
 } buf_xy_t;
@@ -112,7 +113,6 @@ PROCESS_THREAD(finga_process, ev, data)
 
     etimer_set(&et, CLOCK_SECOND);
 
-    static int x = 0;
     while (1) {
         if(etimer_expired(&et)) {
             Leds_off();

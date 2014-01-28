@@ -39,7 +39,7 @@
 #include "button-sensor2.h"
 #include "l3g4200d.h"
 typedef struct {
-    uint8_t x, y;
+    int8_t x, y;
     uint8_t button;
 } buf_xy_t;
 static buf_xy_t buf_xy;
