@@ -101,7 +101,9 @@ PROCESS_THREAD(gyro_process, ev, data)
     angle_data_t gyro_values[L3G4200D_FIFO_SIZE];
 
     while (1) {
-        if(ev == PROCESS_EVENT_TIMER) {
+        PROCESS_YIELD();
+
+        if(ev == PROCESS_EVENT_TIMER && data == &timer) {
             x = y = z = 0;
 
             // get fifo values
@@ -141,8 +143,6 @@ PROCESS_THREAD(gyro_process, ev, data)
             // reset timer
             etimer_reset(&timer);
         }
-        PROCESS_YIELD();
-        // PROCESS_PAUSE();
     }
 
     PROCESS_END();
