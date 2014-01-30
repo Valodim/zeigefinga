@@ -40,7 +40,7 @@ PROCESS_THREAD(rime_unicast_sender, ev, data){
   PROCESS_BEGIN();
 
   // just wait shortly to be sure sensor is available
-  etimer_set(&timer, CLOCK_SECOND * 0.05);
+  etimer_set(&timer, CLOCK_SECOND * 1); //0.05
   PROCESS_YIELD();
 
   leds_init();	
@@ -81,7 +81,7 @@ PROCESS_THREAD(rime_unicast_sender, ev, data){
 
   SENSORS_ACTIVATE(button_sensor);
 
-  etimer_set(&timer, CLOCK_SECOND * 0.01);
+  etimer_set(&timer, CLOCK_SECOND * 1); // 0.01
 
   static int on;
 
