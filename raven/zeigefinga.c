@@ -42,11 +42,34 @@
 #include "lufa.h"
 
 /** Buffer to hold the previously generated Mouse HID report, for comparison purposes inside the HID class driver. */
+static uint8_t PrevKeyboardHIDReportBuffer[sizeof(USB_KeyboardReport_Data_t)];
 static uint8_t PrevMouseHIDReportBuffer[sizeof(USB_MouseReport_Data_t)];
 
 /** LUFA HID Class driver interface configuration and state information. This structure is
  *  passed to all HID Class driver functions, so that multiple instances of the same class
- *  within a device can be differentiated from one another.
+ *  within a device can be differentiated from one another. This is for the keyboard HID
+ *  interface within the device.
+ */
+USB_ClassInfo_HID_Device_t Keyboard_HID_Interface =
+	{
+		.Config =
+			{
+				.InterfaceNumber              = INTERFACE_ID_Keyboard,
+				.ReportINEndpoint             =
+					{
+						.Address              = KEYBOARD_IN_EPADDR,
+						.Size                 = HID_EPSIZE,
+						.Banks                = 1,
+					},
+				.PrevReportINBuffer           = PrevKeyboardHIDReportBuffer,
+				.PrevReportINBufferSize       = sizeof(PrevKeyboardHIDReportBuffer),
+			},
+	};
+
+/** LUFA HID Class driver interface configuration and state information. This structure is
+ *  passed to all HID Class driver functions, so that multiple instances of the same class
+ *  within a device can be differentiated from one another. This is for the mouse HID
+ *  interface within the device.
  */
 USB_ClassInfo_HID_Device_t Mouse_HID_Interface =
 	{
@@ -55,8 +78,8 @@ USB_ClassInfo_HID_Device_t Mouse_HID_Interface =
 				.InterfaceNumber              = INTERFACE_ID_Mouse,
 				.ReportINEndpoint             =
 					{
-						.Address              = MOUSE_EPADDR,
-						.Size                 = MOUSE_EPSIZE,
+						.Address              = MOUSE_IN_EPADDR,
+						.Size                 = HID_EPSIZE,
 						.Banks                = 1,
 					},
 				.PrevReportINBuffer           = PrevMouseHIDReportBuffer,
@@ -68,9 +91,11 @@ USB_ClassInfo_HID_Device_t Mouse_HID_Interface =
 
 
 typedef struct {
-    // this is uint ON PURPOSE!
+    // conversion happening here from the int8 to uint8, which is mapped to the mouse logical range
     uint8_t x, y;
     uint8_t button;
+    uint8_t modifier;
+    uint8_t key;
 } buf_xy_t;
 static buf_xy_t buf_xy;
 
@@ -84,9 +109,14 @@ broadcast_recv(struct broadcast_conn *c, const rimeaddr_t *from)
     buf_xy_t buf;
     buf = *((buf_xy_t*) packetbuf_dataptr());
 
+    // these add up
     buf_xy.x += buf.x;
     buf_xy.y += buf.y;
+
+    // these don't
     buf_xy.button = buf.button;
+    buf_xy.modifier = buf.modifier;
+    buf_xy.key = buf.key;
 
     Leds_on();
     etimer_set(&et, CLOCK_SECOND*0.05);
@@ -118,6 +148,7 @@ PROCESS_THREAD(finga_process, ev, data)
             Leds_off();
         }
 
+        HID_Device_USBTask(&Keyboard_HID_Interface);
         HID_Device_USBTask(&Mouse_HID_Interface);
         USB_USBTask();
 
@@ -143,6 +174,7 @@ void EVENT_USB_Device_ConfigurationChanged(void)
 {
 	bool ConfigSuccess = true;
 
+	ConfigSuccess &= HID_Device_ConfigureEndpoints(&Keyboard_HID_Interface);
 	ConfigSuccess &= HID_Device_ConfigureEndpoints(&Mouse_HID_Interface);
 
 	USB_Device_EnableSOFEvents();
@@ -151,12 +183,14 @@ void EVENT_USB_Device_ConfigurationChanged(void)
 /** Event handler for the library USB Control Request reception event. */
 void EVENT_USB_Device_ControlRequest(void)
 {
+	HID_Device_ProcessControlRequest(&Keyboard_HID_Interface);
 	HID_Device_ProcessControlRequest(&Mouse_HID_Interface);
 }
 
 /** Event handler for the USB device Start Of Frame event. */
 void EVENT_USB_Device_StartOfFrame(void)
 {
+	HID_Device_MillisecondElapsed(&Keyboard_HID_Interface);
 	HID_Device_MillisecondElapsed(&Mouse_HID_Interface);
 }
 
@@ -176,18 +210,41 @@ bool CALLBACK_HID_Device_CreateHIDReport(USB_ClassInfo_HID_Device_t* const HIDIn
                                          void* ReportData,
                                          uint16_t* const ReportSize)
 {
-    USB_MouseReport_Data_t* MouseReport = (USB_MouseReport_Data_t*)ReportData;
+    /* Determine which interface must have its report generated */
+    if (HIDInterfaceInfo == &Keyboard_HID_Interface)
+    {
+        // if(!buf_xy.key)
+            // return 0;
 
-    // set to the currently buffered values
-    MouseReport->Button = buf_xy.button;
-    MouseReport->X = buf_xy.x;
-    MouseReport->Y = buf_xy.y;
+        USB_KeyboardReport_Data_t* KeyboardReport = (USB_KeyboardReport_Data_t*)ReportData;
 
-    buf_xy.x = 0;
-    buf_xy.y = 0;
+        // modifier(s)
+        KeyboardReport->Modifier = buf_xy.modifier;
 
-    *ReportSize = sizeof(USB_MouseReport_Data_t);
-    return true;
+        // key
+        KeyboardReport->KeyCode[0] = buf_xy.key;
+
+        buf_xy.modifier = 0;
+        buf_xy.key = 0;
+
+        *ReportSize = sizeof(USB_KeyboardReport_Data_t);
+        return false;
+    }
+    else
+    {
+        USB_MouseReport_Data_t* MouseReport = (USB_MouseReport_Data_t*)ReportData;
+
+        // set to the currently buffered values
+        MouseReport->Button = buf_xy.button;
+        MouseReport->X = buf_xy.x;
+        MouseReport->Y = buf_xy.y;
+
+        buf_xy.x = 0;
+        buf_xy.y = 0;
+
+        *ReportSize = sizeof(USB_MouseReport_Data_t);
+        return true;
+    }
 }
 
 /** HID class driver callback function for the processing of HID reports from the host.

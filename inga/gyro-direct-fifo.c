@@ -41,6 +41,8 @@
 typedef struct {
     int8_t x, y;
     uint8_t button;
+    uint8_t modifier;
+    uint8_t key;
 } buf_xy_t;
 static buf_xy_t buf_xy;
 
