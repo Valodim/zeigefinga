@@ -29,15 +29,19 @@
  */
 
 /**
- * @file gyro-direct-fifo.c
+ * @file zeigefinga.c
  * @author Vincent Breitmoser <v.breitmoser@tu-bs.de>
  */
 
 #include <stdio.h>
 #include "contiki.h"
 #include "net/rime.h"
+#include "dev/acc-sensor.h"
 #include "button-sensor2.h"
 #include "l3g4200d.h"
+
+#include "keycodes.h"
+
 typedef struct {
     int8_t x, y;
     uint8_t button;
@@ -47,13 +51,13 @@ typedef struct {
 static buf_xy_t buf_xy;
 
 /*---------------------------------------------------------------------------*/
-PROCESS(gyro_process, "gyro process");
-AUTOSTART_PROCESSES(&gyro_process);
+PROCESS(finga_process, "zeigefinga process");
+AUTOSTART_PROCESSES(&finga_process);
 /*---------------------------------------------------------------------------*/
 static struct etimer timer;
 static const struct broadcast_callbacks broadcast_call = {};
 static struct broadcast_conn broadcast;
-PROCESS_THREAD(gyro_process, ev, data)
+PROCESS_THREAD(finga_process, ev, data)
 {
 
     PROCESS_EXITHANDLER(broadcast_close(&broadcast);)
@@ -67,6 +71,22 @@ PROCESS_THREAD(gyro_process, ev, data)
     // just wait shortly to be sure sensor is available
     etimer_set(&timer, CLOCK_SECOND * 0.05);
     PROCESS_YIELD();
+
+    // initialize accelerometer
+    static const struct sensors_sensor *acc_sensor; {
+        acc_sensor = sensors_find("Acc");
+
+        // activate and check status
+        uint8_t status = SENSORS_ACTIVATE(*acc_sensor);
+        if (status == 0) {
+            printf("Error: Failed to init accelerometer, aborting...\n");
+            PROCESS_EXIT();
+        }
+
+        // configure
+        acc_sensor->configure(ACC_CONF_SENSITIVITY, ACC_2G);
+        acc_sensor->configure(ACC_CONF_DATA_RATE, ACC_100HZ);
+    }
 
     // doing gyro initialization directly because fuck contiki
     if (l3g4200d_init() != 0) {
@@ -96,50 +116,100 @@ PROCESS_THREAD(gyro_process, ev, data)
     // how long to wait for the fifo to fill
     etimer_set(&timer, CLOCK_SECOND * 0.03);
 
-    int i, num;
-    int16_t x, y, z;
-    angle_data_t gyro_values[L3G4200D_FIFO_SIZE];
-
     while (1) {
         PROCESS_YIELD();
 
         if(ev == PROCESS_EVENT_TIMER && data == &timer) {
-            x = y = z = 0;
 
-            // get fifo values
-            num = l3g4200d_get_angle_fifo(gyro_values);
-            // or emulate fifo data from bypass mode
-            // gyro_values[0] = l3g4200d_get_angle(); num = 1;
+            { // --- accel ---
 
-#if 1
-            // approach 1: accumulate and divide later
-            // smoother movement, lack of a deadzone leads to shaky cursor
-            for(i = 0; i < num; i++) {
-                x += (gyro_values[i].x * 0.00875);
-                y += (gyro_values[i].y * 0.00875);
-                z += (gyro_values[i].z * 0.00875);
-            }
-            x /= num; y /= num; z /= num;
-#else
-            // approach 2: divide individual values
-            // works as a natural deadzone, which makes controls feel less but
-            // allows keeping the cursor in position easily
-            for(i = 0; i < num; i++) {
-                x += (gyro_values[i].x * 0.00875) / num;
-                y += (gyro_values[i].y * 0.00875) / num;
-                z += (gyro_values[i].z * 0.00875) / num;
-            }
-#endif
-            if(num > 0) {
-                if( (button_sensor2.value(0) || button_sensor2.value(1)) && abs(z)+abs(y) > 0) {
-                    buf_xy.x = z;
-                    buf_xy.y = -y;
-                    buf_xy.button = button_sensor2.value(1);
+                static uint8_t state = 0;
+                static struct {
+                    int16_t x;
+                    int16_t y;
+                } acc_state;
+                uint8_t key = 0;
+
+                switch(state) {
+                    case 0:
+                        if(!button_sensor2.value(1))
+                            break;
+                        state = 1;
+                        acc_state.x = acc_sensor->value(ACC_X);
+                        acc_state.y = acc_sensor->value(ACC_Y);
+                    case 1:
+                        // still pressed down?
+                        if(button_sensor2.value(1))
+                            break;
+
+                        acc_state.x -= acc_sensor->value(ACC_X);
+                        acc_state.y -= acc_sensor->value(ACC_Y);
+
+                        // check for gestures
+                        if(acc_state.x < -1000)
+                            key = HID_KEYBOARD_SC_LEFT_ARROW;
+                        else if(acc_state.x > 1000)
+                            key = HID_KEYBOARD_SC_RIGHT_ARROW;
+                        else if(acc_state.y < -700)
+                            key = HID_KEYBOARD_SC_UP_ARROW;
+                        else if(acc_state.y > 700)
+                            key = HID_KEYBOARD_SC_DOWN_ARROW;
+
+                        // reset all values
+                        acc_state.x = acc_state.y = 0;
+                        state = 0;
+                }
+
+                if(key) {
+                    buf_xy.x = buf_xy.y = buf_xy.modifier = 0;
+                    buf_xy.key = key;
                     packetbuf_copyfrom(&buf_xy, sizeof(buf_xy_t));
                     broadcast_send(&broadcast);
                 }
-                printf("%d\t%d\t%d\t%d\n", num, x, y, z);
+
             }
+
+            { // --- gyro ---
+
+                int i, num;
+                int16_t x, y, z; x = y = z = 0;
+                angle_data_t gyro_values[L3G4200D_FIFO_SIZE];
+
+                // get fifo values
+                num = l3g4200d_get_angle_fifo(gyro_values);
+                // or emulate fifo data from bypass mode
+                // gyro_values[0] = l3g4200d_get_angle(); num = 1;
+
+#if 1
+                // approach 1: accumulate and divide later
+                // smoother movement, lack of a deadzone leads to shaky cursor
+                for(i = 0; i < num; i++) {
+                    x += (gyro_values[i].x * 0.00875);
+                    y += (gyro_values[i].y * 0.00875);
+                    z += (gyro_values[i].z * 0.00875);
+                }
+                x /= num; y /= num; z /= num;
+#else
+                // approach 2: divide individual values
+                // works as a natural deadzone, which makes controls feel less but
+                // allows keeping the cursor in position easily
+                for(i = 0; i < num; i++) {
+                    x += (gyro_values[i].x * 0.00875) / num;
+                    y += (gyro_values[i].y * 0.00875) / num;
+                    z += (gyro_values[i].z * 0.00875) / num;
+                }
+#endif
+                if(num > 0) {
+                    if(button_sensor2.value(0) && abs(z)+abs(y) > 0) {
+                        buf_xy.x = z;
+                        buf_xy.y = -y;
+                        buf_xy.button = buf_xy.modifier = buf_xy.key = 0;
+                        packetbuf_copyfrom(&buf_xy, sizeof(buf_xy_t));
+                        broadcast_send(&broadcast);
+                    }
+                }
+            }
+
             // reset timer
             etimer_reset(&timer);
         }
