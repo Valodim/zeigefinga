@@ -36,6 +36,8 @@
 #include <stdio.h>
 #include "contiki.h"
 #include "net/rime.h"
+#include "acc-sensor.h"
+#include "button-sensor.h"
 #include "button-sensor2.h"
 #include "l3g4200d.h"
 typedef struct {
@@ -60,6 +62,7 @@ PROCESS_THREAD(gyro_process, ev, data)
 
     PROCESS_BEGIN();
 
+    SENSORS_ACTIVATE(button_sensor);
     SENSORS_ACTIVATE(button_sensor2);
 
     broadcast_open(&broadcast, 129, &broadcast_call);
@@ -93,12 +96,38 @@ PROCESS_THREAD(gyro_process, ev, data)
     l3g4200d_set_fifomode(L3G4200D_STREAM);
     l3g4200d_fifo_enable();
 
+    // get pointer to sensor
+    static const struct sensors_sensor *acc_sensor;
+    acc_sensor = sensors_find("Acc");
+
+    {
+        // activate and check status
+        uint8_t status = SENSORS_ACTIVATE(*acc_sensor);
+        if (status == 0) {
+            printf("Error: Failed to init accelerometer, aborting...\n");
+            PROCESS_EXIT();
+        }
+
+        // configure
+        acc_sensor->configure(ACC_CONF_SENSITIVITY, ACC_2G);
+        acc_sensor->configure(ACC_CONF_DATA_RATE, ACC_100HZ);
+    }
+
     // how long to wait for the fifo to fill
     etimer_set(&timer, CLOCK_SECOND * 0.03);
 
     int i, num;
     int16_t x, y, z;
     angle_data_t gyro_values[L3G4200D_FIFO_SIZE];
+
+    static uint8_t state = 0;
+    static struct {
+        uint8_t num;
+        int32_t x;
+        int32_t y;
+    } acc_state;
+    acc_state.x = acc_state.y = 0;
+    int16_t trust = 0;
 
     while (1) {
         PROCESS_YIELD();
@@ -117,7 +146,6 @@ PROCESS_THREAD(gyro_process, ev, data)
             for(i = 0; i < num; i++) {
                 x += (gyro_values[i].x * 0.00875);
                 y += (gyro_values[i].y * 0.00875);
-                z += (gyro_values[i].z * 0.00875);
             }
             x /= num; y /= num; z /= num;
 #else
@@ -130,15 +158,53 @@ PROCESS_THREAD(gyro_process, ev, data)
                 z += (gyro_values[i].z * 0.00875) / num;
             }
 #endif
-            if(num > 0) {
-                if( (button_sensor2.value(0) || button_sensor2.value(1)) && abs(z)+abs(y) > 0) {
-                    buf_xy.x = z;
-                    buf_xy.y = -y;
-                    buf_xy.button = button_sensor2.value(1);
-                    packetbuf_copyfrom(&buf_xy, sizeof(buf_xy_t));
-                    broadcast_send(&broadcast);
-                }
+            uint8_t key = 0;
+            switch(state) {
+                case 0:
+                    if(!button_sensor.value(0))
+                        break;
+                    state = 1;
+                    acc_state.num = 0;
+                case 1:
+                    trust = acc_sensor->value(ACC_Z);
+                    printf("%d\t%d\t%d\n", acc_sensor->value(ACC_X), acc_sensor->value(ACC_Y), trust);
+                    // roughly, trust the X and Y values if Z is > 0
+                    if(trust < -700) {
+                        acc_state.x += acc_sensor->value(ACC_X);
+                        acc_state.y += acc_sensor->value(ACC_Y);
+                        acc_state.num += 1;
+                    }
+                    // still pressed down?
+                    if(button_sensor.value(0))
+                        break;
+
+                    acc_state.x /= acc_state.num;
+                    acc_state.y /= acc_state.num;
+
+                    // check for gestures
+                    printf("> %ld\t%ld\t%d\n", acc_state.x, acc_state.y, acc_state.num);
+
+                    // reset all values
+                    acc_state.x = acc_state.y = 0;
+                    state = 0;
             }
+
+            if(key) {
+                buf_xy.x = buf_xy.y = 0;
+                buf_xy.key = key;
+                packetbuf_copyfrom(&buf_xy, sizeof(buf_xy_t));
+                broadcast_send(&broadcast);
+            }
+
+#if 0
+            if(button_sensor.value(0)) {
+                buf_xy.x = z;
+                buf_xy.y = -y;
+                buf_xy.button = button_sensor2.value(1);
+                packetbuf_copyfrom(&buf_xy, sizeof(buf_xy_t));
+                broadcast_send(&broadcast);
+            }
+#endif
             // reset timer
             etimer_reset(&timer);
         }
