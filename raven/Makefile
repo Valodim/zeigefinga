@@ -1,7 +1,9 @@
 
+all: avrdude
+
 ## CONTIKI ##
 
-CONTIKI_PROJECT = zeigefinga
+CONTIKI_PROJECT = zeigeraven
 
 CONTIKI = ../lib/contiki-raven
 
@@ -45,7 +47,7 @@ CFLAGS       += -DUSE_LUFA_CONFIG_HEADER -IConfig/
 OPTIMIZATION = s
 
 # multipurpose, see above!
-TARGET       = zeigefinga
+TARGET       = zeigeraven
 
 # include lufa sources, build as normal otherwise
 include $(LUFA_PATH)/Build/lufa_sources.mk

@@ -1,4 +1,4 @@
-CONTIKI_PROJECT = button_demo
+CONTIKI_PROJECT = zeigefinga
 
 all: $(CONTIKI_PROJECT)
 
