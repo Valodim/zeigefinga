@@ -131,6 +131,7 @@ PROCESS_THREAD(finga_process, ev, data)
                 } acc_state;
                 uint8_t key = 0;
 
+
                 switch(state) {
                     case 0:
                         if(!button_sensor2.value(1))
@@ -178,6 +179,7 @@ PROCESS_THREAD(finga_process, ev, data)
 
                 int i, num;
                 int16_t x, y, z; x = y = z = 0;
+                double x_factor, y_factor;
                 angle_data_t gyro_values[L3G4200D_FIFO_SIZE];
 
                 // get fifo values
@@ -185,7 +187,6 @@ PROCESS_THREAD(finga_process, ev, data)
                 // or emulate fifo data from bypass mode
                 // gyro_values[0] = l3g4200d_get_angle(); num = 1;
 
-#if 1
                 // approach 1: accumulate and divide later
                 // smoother movement, lack of a deadzone leads to shaky cursor
                 for(i = 0; i < num; i++) {
@@ -195,59 +196,43 @@ PROCESS_THREAD(finga_process, ev, data)
                 }
                 x /= num; y /= num; z /= num;
                         
-#else
-                // approach 2: divide individual values
-                // works as a natural deadzone, which makes controls feel less but
-                // allows keeping the cursor in position easily
-                for(i = 0; i < num; i++) {
-                    x += (gyro_values[i].x * 0.00875) / num;
-                    y += (gyro_values[i].y * 0.00875) / num;
-                    z += (gyro_values[i].z * 0.00875) / num;
-                }
-#endif
+                { // --- acc factor ---
 
-// ---- acc ---------------------------------------------------------
-                static struct {
-                    int16_t x;
-                    int16_t y;
-                    int16_t z;
-                } acc_state;
-                acc_state.x = acc_sensor->value(ACC_X);
-                acc_state.y = acc_sensor->value(ACC_Y);
-                acc_state.z = acc_sensor->value(ACC_Z);
-                
-                //TODO: ratio over multiple values
-                double ratio = acc_state.x/acc_state.z;
-                double x_factor, y_factor;
-                    int16_t tmp1;
-                    int16_t tmp2;
+                    static struct {
+                        int16_t x;
+                        int16_t y;
+                        int16_t z;
+                    } acc_state;
+                    acc_state.x = acc_sensor->value(ACC_X);
+                    acc_state.y = acc_sensor->value(ACC_Y);
+                    acc_state.z = acc_sensor->value(ACC_Z);
+                    
+                    //TODO: ratio over multiple values
+                    double ratio = acc_state.x/acc_state.z;
+                    printf("Ratio: %d \n", (int) (ratio*100));
 
-                if(ratio > 10 ){  // hard left turn
-                    x_factor = 10;
-                    y_factor = 0.1; 
- //                   tmp1 = y;
- //                   y = -z;
- //                   z = tmp1;
-                                    
+                    if(ratio > 10 ){  // hard left turn
+                        x_factor = 10;
+                        y_factor = 0.1; 
+                                        
+                    }
+                    if(ratio >= 1 && ratio <=10 ){ // ligth left turn
+                        x_factor = 2;
+                        y_factor = 0.5;                  
+                    }
+                    if(ratio >= -1 && ratio <=1 ){ // no turn
+                        x_factor = 1;
+                        y_factor = 1;                  
+                    }
+                    if(ratio >= -10 && ratio < -1 ){ // ligth rigth turn
+                        x_factor = 2;
+                        y_factor = 0.5;                  
+                    }
+                    if(ratio < -10){ // right turn
+                        x_factor = 2;
+                        y_factor = 0.5;                  
+                    }
                 }
-                if(ratio >= 1 && ratio <=10 ){ // ligth left turn
-                    x_factor = 2;
-                    y_factor = 0.5;                  
-                }
-                if(ratio >= -1 && ratio <=1 ){ // no turn
-                    x_factor = 1;
-                    y_factor = 1;                  
-                }
-                if(ratio >= -10 && ratio < -1 ){ // ligth rigth turn
-                    x_factor = 2;
-                    y_factor = 0.5;                  
-                }
-                if(ratio < -10){ // right turn
-                    x_factor = 2;
-                    y_factor = 0.5;                  
-                }
-
-// ---- acc ---------------------------------------------------------
 
                 if(num > 0) {
                     if(button_sensor2.value(0) && abs(z)+abs(y) > 0) {
