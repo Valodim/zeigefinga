@@ -122,6 +122,40 @@ PROCESS_THREAD(finga_process, ev, data)
 
         if(ev == PROCESS_EVENT_TIMER && data == &timer) {
 
+            {// --- doubleclick ---
+                static uint8_t button_state = 0;
+                uint8_t button = 0;
+                static struct etimer double_click;
+
+                switch(button_state) {
+                    case 0:
+                        if(button_sensor2.value(1)){
+                            etimer_set(&double_click, CLOCK_SECOND / 1);
+                            button_state = 1;
+                        }
+                        break;
+                    case 1:
+                        // still pressed down?
+                        if(!button_sensor2.value(1))
+                              button_state = 2;
+                        break;
+                    case 2:
+                        if(button_sensor2.value(1) && !etimer_expired(&double_click)){
+                              button = 1;
+                        }
+                        button_state = 0;
+                        break;
+                }
+                if(button){
+                    buf_xy.button = button;
+                    packetbuf_copyfrom(&buf_xy, sizeof(buf_xy_t));
+                    broadcast_send(&broadcast);
+                    buf_xy.button = 0;
+                    packetbuf_copyfrom(&buf_xy, sizeof(buf_xy_t));
+                    broadcast_send(&broadcast);
+                }
+            }
+
             { // --- accel ---
 
                 static uint8_t state = 0;
@@ -207,7 +241,6 @@ PROCESS_THREAD(finga_process, ev, data)
                     acc_state.y = acc_sensor->value(ACC_Y);
                     acc_state.z = acc_sensor->value(ACC_Z);
                     
-                    //TODO: ratio over multiple values
                     double ratio = acc_state.x/acc_state.z;
                     printf("Ratio: %d \n", (int) (ratio*100));
 
@@ -224,7 +257,7 @@ PROCESS_THREAD(finga_process, ev, data)
                         x_factor = 1;
                         y_factor = 1;                  
                     }
-                    if(ratio >= -10 && ratio < -1 ){ // ligth rigth turn
+                    if(ratio >= -10 && ratio < -1 ){ // ligth righ turn
                         x_factor = 2;
                         y_factor = 0.5;                  
                     }
