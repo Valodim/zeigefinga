@@ -122,15 +122,16 @@ PROCESS_THREAD(finga_process, ev, data)
 
         if(ev == PROCESS_EVENT_TIMER && data == &timer) {
 
-            {// --- doubleclick ---
+            {// --- doubleclick button for one click ---
                 static uint8_t button_state = 0;
-                uint8_t button = 0;
+                static uint8_t button = 0;
                 static struct etimer double_click;
+                static struct etimer time;
 
                 switch(button_state) {
                     case 0:
                         if(button_sensor2.value(1)){
-                            etimer_set(&double_click, CLOCK_SECOND / 1);
+                            etimer_set(&double_click, CLOCK_SECOND);
                             button_state = 1;
                         }
                         break;
@@ -140,10 +141,13 @@ PROCESS_THREAD(finga_process, ev, data)
                               button_state = 2;
                         break;
                     case 2:
-                        if(button_sensor2.value(1) && !etimer_expired(&double_click)){
+                        if(button_sensor2.value(1) && !etimer_expired(&double_click)){ //&& !etimer_expired(&double_click)
                               button = 1;
+                              printf("Button: %d \n", button);
+                              button_state = 0;
                         }
-                        button_state = 0;
+                        if (etimer_expired(&double_click))
+                              button_state = 0;
                         break;
                 }
                 if(button){
@@ -153,6 +157,7 @@ PROCESS_THREAD(finga_process, ev, data)
                     buf_xy.button = 0;
                     packetbuf_copyfrom(&buf_xy, sizeof(buf_xy_t));
                     broadcast_send(&broadcast);
+                    button = 0;
                 }
             }
 
@@ -242,7 +247,7 @@ PROCESS_THREAD(finga_process, ev, data)
                     acc_state.z = acc_sensor->value(ACC_Z);
                     
                     double ratio = acc_state.x/acc_state.z;
-                    printf("Ratio: %d \n", (int) (ratio*100));
+                    // printf("Ratio: %d \n", (int) (ratio*100));
 
                     if(ratio > 10 ){  // hard left turn
                         x_factor = 10;
