@@ -126,7 +126,6 @@ PROCESS_THREAD(finga_process, ev, data)
                 static uint8_t button_state = 0;
                 static uint8_t button = 0;
                 static struct etimer double_click;
-                static struct etimer time;
 
                 switch(button_state) {
                     case 0:
@@ -143,7 +142,6 @@ PROCESS_THREAD(finga_process, ev, data)
                     case 2:
                         if(button_sensor2.value(1) && !etimer_expired(&double_click)){ //&& !etimer_expired(&double_click)
                               button = 1;
-                              printf("Button: %d \n", button);
                               button_state = 0;
                         }
                         if (etimer_expired(&double_click))
