@@ -48,6 +48,7 @@ typedef struct {
     uint8_t button;
     uint8_t modifier;
     uint8_t key;
+    uint8_t check;
 } buf_xy_t;
 static buf_xy_t buf_xy;
 
@@ -72,6 +73,7 @@ PROCESS_THREAD(finga_process, ev, data)
     // just wait shortly to be sure sensor is available
     etimer_set(&timer, CLOCK_SECOND * 0.05);
     PROCESS_YIELD();
+    buf_xy.check = 219;
 
     // initialize accelerometer
     static const struct sensors_sensor *acc_sensor; {
@@ -130,7 +132,7 @@ PROCESS_THREAD(finga_process, ev, data)
                 switch(button_state) {
                     case 0:
                         if(button_sensor2.value(1)){
-                            etimer_set(&double_click, CLOCK_SECOND);
+                            etimer_set(&double_click, CLOCK_SECOND*0.25);
                             button_state = 1;
                         }
                         break;
@@ -140,7 +142,7 @@ PROCESS_THREAD(finga_process, ev, data)
                               button_state = 2;
                         break;
                     case 2:
-                        if(button_sensor2.value(1) && !etimer_expired(&double_click)){ //&& !etimer_expired(&double_click)
+                        if(button_sensor2.value(1) && !etimer_expired(&double_click)){ //
                               button = 1;
                               button_state = 0;
                         }
