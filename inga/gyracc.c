@@ -73,8 +73,8 @@ PROCESS_THREAD(finga_process, ev, data)
     // just wait shortly to be sure sensor is available
     etimer_set(&timer, CLOCK_SECOND * 0.05);
     PROCESS_YIELD();
-    buf_xy.check = 219;
-
+    buf_xy.check = 219; // checkvalue
+    // buf_xy.check = 218; // wrong checkvalue
     // initialize accelerometer
     static const struct sensors_sensor *acc_sensor; {
         acc_sensor = sensors_find("Acc");
@@ -132,7 +132,7 @@ PROCESS_THREAD(finga_process, ev, data)
                 switch(button_state) {
                     case 0:
                         if(button_sensor2.value(1)){
-                            etimer_set(&double_click, CLOCK_SECOND*0.25);
+                            etimer_set(&double_click, CLOCK_SECOND*0.20);
                             button_state = 1;
                         }
                         break;
@@ -151,13 +151,14 @@ PROCESS_THREAD(finga_process, ev, data)
                         break;
                 }
                 if(button){
+                    buf_xy.button = button; // press button
+                    buf_xy.modifier = buf_xy.key = buf_xy.x = buf_xy.y = 0;  //prevent unwanted behaviour
+                    packetbuf_copyfrom(&buf_xy, sizeof(buf_xy_t));
+                    broadcast_send(&broadcast);
+                    button = 0;  // release button
                     buf_xy.button = button;
                     packetbuf_copyfrom(&buf_xy, sizeof(buf_xy_t));
                     broadcast_send(&broadcast);
-                    buf_xy.button = 0;
-                    packetbuf_copyfrom(&buf_xy, sizeof(buf_xy_t));
-                    broadcast_send(&broadcast);
-                    button = 0;
                 }
             }
 
