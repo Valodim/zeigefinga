@@ -123,7 +123,7 @@ broadcast_recv(struct broadcast_conn *c, const rimeaddr_t *from)
         Led0_on();
     }
     else
-        Led2_on();
+        Led1_on();
     etimer_set(&et, CLOCK_SECOND*0.05);
 }
 static const struct broadcast_callbacks broadcast_call = {broadcast_recv};
