@@ -96,6 +96,7 @@ typedef struct {
     uint8_t button;
     uint8_t modifier;
     uint8_t key;
+    uint8_t check;
 } buf_xy_t;
 static buf_xy_t buf_xy;
 
@@ -105,20 +106,24 @@ static void
 broadcast_recv(struct broadcast_conn *c, const rimeaddr_t *from)
 {
   // printf("broadcast message received from %d.%d: '%s'\n",
-     //     from->u8[0], from->u8[1], (char *)packetbuf_dataptr());
+     //     from->u8[0], from->u8[1], (char *)packetbuf_dataptr());      
     buf_xy_t buf;
     buf = *((buf_xy_t*) packetbuf_dataptr());
+    
+    if (buf.check == 219){
+        // these add up
+        buf_xy.x += buf.x;
+        buf_xy.y += buf.y;
 
-    // these add up
-    buf_xy.x += buf.x;
-    buf_xy.y += buf.y;
+        // these don't
+        buf_xy.button = buf.button;
+        buf_xy.modifier = buf.modifier;
+        buf_xy.key = buf.key;
 
-    // these don't
-    buf_xy.button = buf.button;
-    buf_xy.modifier = buf.modifier;
-    buf_xy.key = buf.key;
-
-    Leds_on();
+        Led0_on();
+    }
+    else
+        Led2_on();
     etimer_set(&et, CLOCK_SECOND*0.05);
 }
 static const struct broadcast_callbacks broadcast_call = {broadcast_recv};
