@@ -31,6 +31,7 @@
 /**
  * @file zeigefinga.c
  * @author Vincent Breitmoser <v.breitmoser@tu-bs.de>
+ * @author Christina Eberth <c.eberth@tu-bs.de>
  */
 
 #include <stdio.h>
