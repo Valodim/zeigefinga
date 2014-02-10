@@ -31,6 +31,7 @@
 /**
  * @file zeigefinga.c
  * @author Vincent Breitmoser <v.breitmoser@tu-bs.de>
+ * @author Christina Eberth <c.eberth@tu-bs.de>
  */
 
 #include <stdio.h>
@@ -51,6 +52,7 @@ typedef struct {
     uint8_t check;
 } buf_xy_t;
 static buf_xy_t buf_xy;
+static uint8_t enable_click = 0; // disable click function whilst demonstration
 
 /*---------------------------------------------------------------------------*/
 PROCESS(finga_process, "zeigefinga process");
@@ -125,40 +127,42 @@ PROCESS_THREAD(finga_process, ev, data)
         if(ev == PROCESS_EVENT_TIMER && data == &timer) {
 
             {// --- doubleclick button for one click ---
-                static uint8_t button_state = 0;
-                static uint8_t button = 0;
-                static struct etimer double_click;
+                if(enable_click){ // possibility to disable clicking in demonstrations
+                    static uint8_t button_state = 0;
+                    static uint8_t button = 0;
+                    static struct etimer double_click;
 
-                switch(button_state) {
-                    case 0:
-                        if(button_sensor2.value(1)){
-                            etimer_set(&double_click, CLOCK_SECOND*0.20);
-                            button_state = 1;
-                        }
-                        break;
-                    case 1:
-                        // still pressed down?
-                        if(!button_sensor2.value(1))
-                              button_state = 2;
-                        break;
-                    case 2:
-                        if(button_sensor2.value(1) && !etimer_expired(&double_click)){ //
-                              button = 1;
-                              button_state = 0;
-                        }
-                        if (etimer_expired(&double_click))
-                              button_state = 0;
-                        break;
-                }
-                if(button){
-                    buf_xy.button = button; // press button
-                    buf_xy.modifier = buf_xy.key = buf_xy.x = buf_xy.y = 0;  //prevent unwanted behaviour
-                    packetbuf_copyfrom(&buf_xy, sizeof(buf_xy_t));
-                    broadcast_send(&broadcast);
-                    button = 0;  // release button
-                    buf_xy.button = button;
-                    packetbuf_copyfrom(&buf_xy, sizeof(buf_xy_t));
-                    broadcast_send(&broadcast);
+                    switch(button_state) {
+                        case 0:
+                            if(button_sensor2.value(1)){
+                                etimer_set(&double_click, CLOCK_SECOND*0.20);
+                                button_state = 1;
+                            }
+                            break;
+                        case 1:
+                            // still pressed down?
+                            if(!button_sensor2.value(1))
+                                  button_state = 2;
+                            break;
+                        case 2:
+                            if(button_sensor2.value(1) && !etimer_expired(&double_click)){ //
+                                  button = 1;
+                                  button_state = 0;
+                            }
+                            if (etimer_expired(&double_click))
+                                  button_state = 0;
+                            break;
+                    }
+                    if(button){
+                        buf_xy.button = button; // press button
+                        buf_xy.modifier = buf_xy.key = buf_xy.x = buf_xy.y = 0;  //prevent unwanted behaviour
+                        packetbuf_copyfrom(&buf_xy, sizeof(buf_xy_t));
+                        broadcast_send(&broadcast);
+                        button = 0;  // release button
+                        buf_xy.button = button;
+                        packetbuf_copyfrom(&buf_xy, sizeof(buf_xy_t));
+                        broadcast_send(&broadcast);
+                    }
                 }
             }
 
