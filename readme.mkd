@@ -1,13 +1,60 @@
+# ZeigefINGA
 
-usage:
+ZeigefINGA ist ein Projekt mit dem Ziel, die
+[INGA Platform](http://www.ibr.cs.tu-bs.de/projects/inga/) als pointing device,
+bzw "virtuellen Laserpointer" zu verwenden. Der INGA Knoten sendet dabei Pakete
+in einem simplen Format ueber Rime, die von einem avr-ravenusb empfangen, als
+Maus- und Tastatureingaben interpretiert und an ein USB HID faehiges Geraet
+weitergegeben werden.
 
-make login 2> /dev/null | egrep --line-buffered '^(\-?[0-9]+ ?){7}' | python animate.py 1 2 3
 
-make login 2> /dev/null | egrep --line-buffered '^(\-?[0-9]+ ?){7}' | python point.py
+## INGA
+
+    # compile zeigefinga
+    make zeigefinga
+    # flash inga node
+    make zeigefinga.upload
+
+## avr-ravenusb
+
+Die Firmware fuer den Raven USB Stick verwendet ein [modifiziertes
+Contiki](https://github.com/Valodim/contiki) in /lib/contiki-raven sowie ein
+(unmodifiziertes)
+[LUFA](https://github.com/abcminiuser/lufa) in /lib/lufa als Library fuer die
+USB Schnittstelle.
+
+    # compile lufa for linking
+    make libzeigeraven.a
+    # compile contiki
+    make zeigeraven
+    # flash raven using avrdude
+    make avrdude
 
 
-udev rules for inga, /etc/udev/rules.d/99-inga.conf
+## Misc
 
-SUBSYSTEM=="usb", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", ATTRS{product}=="INGA", GROUP="plugdev"
+### Pyhon utilities
 
-SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", ATTRS{product}=="INGA", GROUP="plugdev"
+Im /py Verzeichnis befinden sich verschiedene tools, die wir zur Auswertung und
+Visualisierung von Sensordaten verwendet haben. Die Anwendungen arbeiten mit
+nach stdin gepipeten, whitespace separated Zahlen und sind damit bequem
+wiederverwendbar.
+
+Beispiele:
+
+    # animate the second and third value of stdin
+    make login | python animate.py 2 3 
+
+    # save data to file
+    make login > data
+    # animate replayed data
+    pv --rate-limit 20 data | python animate.py 1 2 3
+
+
+### udev rules
+
+usually in /etc/udev/rules.d/99-inga.conf
+
+    SUBSYSTEM=="usb", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", ATTRS{product}=="INGA", GROUP="plugdev"
+    SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", ATTRS{product}=="INGA", GROUP="plugdev"
+
